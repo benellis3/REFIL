@@ -1,26 +1,29 @@
 import datetime
-from functools import partial
-from math import ceil
-import imageio
+import json
 import os
 import pprint
-import time
-import json
 import threading
+import time
+import uuid
+from os.path import abspath, basename, dirname, join, splitext
+from types import SimpleNamespace as SN
+
+import imageio
 import torch as th
 from numpy.random import RandomState
-from types import SimpleNamespace as SN
-from utils.logging import Logger
-from utils.timehelper import time_left, time_str
-from os.path import dirname, abspath, basename, join, splitext
 
-from learners import REGISTRY as le_REGISTRY
-from runners import REGISTRY as r_REGISTRY
-from controllers import REGISTRY as mac_REGISTRY
-from envs import s_REGISTRY
 from components.episode_buffer import ReplayBuffer
 from components.transforms import OneHot
+from controllers import REGISTRY as mac_REGISTRY
+from envs import s_REGISTRY
+from learners import REGISTRY as le_REGISTRY
+from runners import REGISTRY as r_REGISTRY
+from utils.logging import Logger
+from utils.timehelper import time_left, time_str
 
+
+def generate_tag(algo_name, map_name):
+    return algo_name + "-" + map_name + "-" + uuid.uuid4().hex[:6]
 
 def run(_run, _config, _log):
     # check args sanity
@@ -28,6 +31,7 @@ def run(_run, _config, _log):
 
     args = SN(**_config)
     args.device = "cuda" if args.use_cuda else "cpu"
+    args.tag = generate_tag(args.name, args.env_args["map_name"])
 
     # setup loggers
     logger = Logger(_log)
@@ -46,6 +50,8 @@ def run(_run, _config, _log):
         tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
         logger.setup_tb(tb_exp_direc)
 
+    if args.use_wandb:
+        logger.setup_wandb(args)
     # sacred is on by default
     logger.setup_sacred(_run)
 
