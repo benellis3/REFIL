@@ -22,6 +22,13 @@ class EpisodeRunner:
 
         self.t_env = 0
 
+        # Log the first run
+        self.log_train_stats_t = -1000000
+
+    def setup(self, scheme, groups, preprocess, mac):
+        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit + 1,
+                                 preprocess=preprocess, device=self.args.device)
+
         self.n_train_tasks = self.args.n_train_tasks
         self.n_test_tasks = self.args.n_test_tasks
         self.task_train_returns = {x: [] for x in range(self.args.n_train_tasks)}
@@ -29,12 +36,6 @@ class EpisodeRunner:
         self.task_train_stats = {x: {} for x in range(self.args.n_train_tasks)}
         self.task_test_stats = {x: {} for x in range(self.args.n_test_tasks)}
 
-        # Log the first run
-        self.log_train_stats_t = -1000000
-
-    def setup(self, scheme, groups, preprocess, mac):
-        self.new_batch = partial(EpisodeBatch, scheme, groups, self.batch_size, self.episode_limit + 1,
-                                 preprocess=preprocess, device=self.args.device)
         self.mac = mac
 
     def get_env_info(self):

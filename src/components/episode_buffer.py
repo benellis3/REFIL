@@ -60,7 +60,7 @@ class EpisodeBatch:
             group = field_info.get("group", None)
             dtype = field_info.get("dtype", th.float32)
 
-            if isinstance(vshape, int):
+            if isinstance(vshape, (int, np.int64)):
                 vshape = (vshape,)
 
             if group:
