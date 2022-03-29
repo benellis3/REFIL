@@ -157,6 +157,9 @@ def run_sequential(args, logger):
     env_info = runner.get_env_info()
     args.n_agents = env_info["n_agents"]
     args.n_actions = env_info["n_actions"]
+    args.n_test_tasks = env_info["n_test_tasks"]
+    args.n_train_tasks = env_info["n_train_tasks"]
+    args.test_nepisode *= args.n_test_tasks
     if not args.entity_scheme:
         args.state_shape = env_info["state_shape"]
         # Default/Base scheme

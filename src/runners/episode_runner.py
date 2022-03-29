@@ -22,10 +22,12 @@ class EpisodeRunner:
 
         self.t_env = 0
 
-        self.train_returns = []
-        self.test_returns = []
-        self.train_stats = {}
-        self.test_stats = {}
+        self.n_train_tasks = self.args.n_train_tasks
+        self.n_test_tasks = self.args.n_test_tasks
+        self.task_train_returns = {x: [] for x in range(self.args.n_train_tasks)}
+        self.task_test_returns = {x: [] for x in range(self.args.n_test_tasks)}
+        self.task_train_stats = {x: {} for x in range(self.args.n_train_tasks)}
+        self.task_test_stats = {x: {} for x in range(self.args.n_test_tasks)}
 
         # Log the first run
         self.log_train_stats_t = -1000000
@@ -46,8 +48,9 @@ class EpisodeRunner:
 
     def reset(self, test=False, index=None):
         self.batch = self.new_batch()
-        self.env.reset(test=test, index=index)
+        cur_task_id = self.env.reset(test=test, index=index)
         self.t = 0
+        return cur_task_id
 
     def _get_pre_transition_data(self):
         if self.args.entity_scheme:
@@ -81,7 +84,7 @@ class EpisodeRunner:
         """
         if test_scen is None:
             test_scen = test_mode
-        self.reset(test=test_scen, index=index)
+        cur_task_id = self.reset(test=test_scen, index=index)
         if vid_writer is not None:
             vid_writer.append_data(self.env.render())
         terminated = False
@@ -121,22 +124,23 @@ class EpisodeRunner:
         actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=test_mode)
         self.batch.update({"actions": actions}, ts=self.t)
 
-        cur_stats = self.test_stats if test_mode else self.train_stats
-        cur_returns = self.test_returns if test_mode else self.train_returns
-        log_prefix = "test_" if test_mode else ""
-        cur_stats.update({k: cur_stats.get(k, 0) + env_info.get(k, 0) for k in set(cur_stats) | set(env_info)})
-        cur_stats["n_episodes"] = 1 + cur_stats.get("n_episodes", 0)
-        cur_stats["ep_length"] = self.t + cur_stats.get("ep_length", 0)
+        task_cur_stats = self.task_test_stats[cur_task_id] if test_mode else self.task_train_stats[cur_task_id]
+        task_cur_returns = self.task_test_returns[cur_task_id] if test_mode else self.task_train_returns[cur_task_id]
+        task_log_prefix = "task_" + str(cur_task_id) + "_test_" if test_mode else "task_" + str(cur_task_id) + "_train_"
+        task_cur_stats.update(
+            {k: task_cur_stats.get(k, 0) + env_info.get(k, 0) for k in set(task_cur_stats) | set(env_info)})
+        task_cur_stats["n_episodes"] = 1 + task_cur_stats.get("n_episodes", 0)
+        task_cur_stats["ep_length"] = self.t + task_cur_stats.get("ep_length", 0)
 
         if not test_mode:
             self.t_env += self.t
 
-        cur_returns.append(episode_return)
+        task_cur_returns.append(episode_return)
 
-        if test_mode and (len(self.test_returns) == self.args.test_nepisode):
-            self._log(cur_returns, cur_stats, log_prefix)
+        if test_mode and (len(self.task_test_returns[cur_task_id]) == self.args.test_nepisode / self.n_test_tasks):
+            self._log(task_cur_returns, task_cur_stats, task_log_prefix)
         elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
-            self._log(cur_returns, cur_stats, log_prefix)
+            self._log(task_cur_returns, task_cur_stats, task_log_prefix)
             if hasattr(self.mac.action_selector, "epsilon"):
                 self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
             self.log_train_stats_t = self.t_env
